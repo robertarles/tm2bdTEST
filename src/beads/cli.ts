@@ -27,14 +27,32 @@ class BeadsCli {
     if (this.verbose) {
       console.log(`[bd] ${args.join(' ')}`);
     }
-
-    const result = await execa('bd', args, { cwd: this.projectPath });
-
-    if (this.verbose && result.stdout) {
-      console.log(result.stdout);
+    try {
+      const result = await execa('bd', args, { cwd: this.projectPath });
+      if (this.verbose && result.stdout) {
+        console.log(result.stdout);
+      }
+      return result.stdout;
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        throw new Error('bd command not found - ensure beads is installed');
+      }
+      if (error && typeof error === 'object' && 'stderr' in error) {
+        const stderr = (error as { stderr: string }).stderr;
+        throw new Error(`bd command failed: ${args.join(' ')}\n${stderr}`);
+      }
+      throw error;
     }
+  }
 
-    return result.stdout;
+  async checkInit(): Promise<boolean> {
+    try {
+      const { access } = await import('node:fs/promises');
+      await access(`${this.projectPath}/.beads`);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async addDependency(blockedId: string, blockingId: string): Promise<void> {
@@ -55,7 +73,15 @@ class BeadsCli {
       args.push(`--description=${description}`);
     }
     const stdout = await this.exec(args);
-    const parsed = JSON.parse(stdout);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(stdout);
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        throw new Error(`Failed to parse bd output as JSON: ${stdout}`);
+      }
+      throw e;
+    }
     return BeadsCreateOutputSchema.parse(parsed);
   }
 
@@ -65,7 +91,15 @@ class BeadsCli {
       args.push(`--description=${description}`);
     }
     const stdout = await this.exec(args);
-    const parsed = JSON.parse(stdout);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(stdout);
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        throw new Error(`Failed to parse bd output as JSON: ${stdout}`);
+      }
+      throw e;
+    }
     return BeadsCreateOutputSchema.parse(parsed);
   }
 }

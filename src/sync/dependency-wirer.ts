@@ -78,3 +78,12 @@ export async function wireSubtaskDependencies(
     }
   }
 }
+
+export async function wireAllDependencies(
+  tasks: DepTask[],
+  cli: DepCli,
+  mapper: DepMapper,
+): Promise<void> {
+  await wireEpicDependencies(tasks, cli, mapper);
+  await wireSubtaskDependencies(tasks, cli, mapper);
+}

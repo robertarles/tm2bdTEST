@@ -63,8 +63,82 @@ program
       mapper = new IdMapper();
     }
 
-    // Sync pipeline will be wired here in 9sz.3+
-    console.log('Precondition checks passed. Sync pipeline not yet wired.');
+    // 3. Run sync pipeline
+    try {
+      console.log(chalk.bold('tm2bd: Task-Master to Beads Sync\n'));
+
+      // Parse tasks
+      const { parseTasksJson } = await import('./schemas/taskmaster.js');
+      console.log(chalk.blue('Loading tasks...'));
+      const project = await parseTasksJson(options.tasks);
+      console.log(chalk.green(`  Loaded ${project.tasks.length} tasks from ${options.tasks}`));
+
+      // Topological sort
+      const { topoSortDeterministic } = await import('./utils/topo-sort.js');
+      const sorted = topoSortDeterministic(project.tasks);
+      const maxTier = sorted.length > 0 ? sorted[sorted.length - 1].tier : 0;
+      console.log(chalk.green(`  Sorted into ${maxTier + 1} tiers`));
+
+      // Dry-run mode
+      if (options.dryRun) {
+        console.log(chalk.yellow('\n[DRY RUN MODE - No changes will be made]\n'));
+        for (const task of sorted) {
+          console.log(chalk.gray(`  bd create --title="${task.title}" -t epic -p ${task.priority}`));
+          if (task.subtasks) {
+            for (const sub of task.subtasks) {
+              console.log(chalk.gray(`    bd create --title="${sub.title}" --parent <epic-id>`));
+            }
+          }
+          for (const depId of task.dependencies) {
+            console.log(chalk.gray(`  bd dep add <task-${task.id}-epic> <task-${depId}-epic>`));
+          }
+        }
+        console.log(chalk.yellow('\nDry run complete. No changes were made.'));
+        process.exit(0);
+      }
+
+      // Create Beads CLI wrapper
+      const { BeadsCli } = await import('./beads/cli.js');
+      const cli = new BeadsCli({ projectPath: options.project, verbose: options.verbose });
+
+      // Create epics
+      const { createEpics } = await import('./sync/epic-creator.js');
+      console.log(chalk.blue('\nCreating epics...'));
+      await createEpics(sorted, cli, mapper, (current, total) => {
+        console.log(chalk.gray(`  ${current}/${total} epics created`));
+      });
+      console.log(chalk.green(`  All ${sorted.length} epics created`));
+
+      // Create children
+      const { createAllChildren } = await import('./sync/child-creator.js');
+      console.log(chalk.blue('\nCreating child issues...'));
+      await createAllChildren(sorted, cli, mapper, (current, total) => {
+        console.log(chalk.gray(`  ${current}/${total} children created`));
+      });
+      console.log(chalk.green('  All children created'));
+
+      // Wire dependencies
+      const { wireAllDependencies } = await import('./sync/dependency-wirer.js');
+      console.log(chalk.blue('\nWiring dependencies...'));
+      await wireAllDependencies(sorted, cli, mapper);
+      console.log(chalk.green('  All dependencies wired'));
+
+      // Sync statuses
+      const { syncAllStatuses } = await import('./sync/status-syncer.js');
+      console.log(chalk.blue('\nSyncing statuses...'));
+      await syncAllStatuses(sorted, cli, mapper);
+      console.log(chalk.green('  All statuses synchronized'));
+
+      // Save mapping
+      await mapper.save(options.mapFile);
+      console.log(chalk.green(`\n  Mapping saved to ${options.mapFile}`));
+
+      console.log(chalk.bold.green('\nSync complete!'));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red(`\nSync failed: ${message}`));
+      process.exit(1);
+    }
   });
 
 program.parse();

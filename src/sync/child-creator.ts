@@ -16,6 +16,10 @@ export interface ChildTask {
   subtasks?: Array<ChildSubtask & { id: number; title: string }>;
 }
 
+export interface ChildEpicMapper extends ChildMapper {
+  getEpicId(tmId: number): string | undefined;
+}
+
 export function formatChildDescription(subtask: ChildSubtask): string {
   const parts: string[] = [subtask.description];
 
@@ -47,5 +51,27 @@ export async function createChildren(
     const description = formatChildDescription(subtask);
     const result = await cli.createChild(epicId, subtask.title, description);
     mapper.addSubtask(task.id, subtask.id, result.id);
+  }
+}
+
+export async function createAllChildren(
+  tasks: ChildTask[],
+  cli: ChildCli,
+  mapper: ChildEpicMapper,
+  onProgress?: (current: number, total: number) => void
+): Promise<void> {
+  const totalSubtasks = tasks.reduce((sum, t) => sum + (t.subtasks?.length || 0), 0);
+  let processed = 0;
+
+  for (const task of tasks) {
+    const epicId = mapper.getEpicId(task.id);
+    if (!epicId) {
+      throw new Error(`Epic ID not found for task ${task.id} - epic must be created first`);
+    }
+    await createChildren(task, epicId, cli, mapper);
+    processed += task.subtasks?.length || 0;
+    if (onProgress) {
+      onProgress(processed, totalSubtasks);
+    }
   }
 }

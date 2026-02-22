@@ -65,3 +65,17 @@ export async function createEpic(task: EpicTask, cli: EpicCli, mapper: EpicMappe
   mapper.addEpic(task.id, result.id);
   return result.id;
 }
+
+export async function createEpics(
+  tasks: EpicTask[],
+  cli: EpicCli,
+  mapper: EpicMapper,
+  onProgress?: (current: number, total: number) => void
+): Promise<void> {
+  for (let i = 0; i < tasks.length; i++) {
+    await createEpic(tasks[i], cli, mapper);
+    if (onProgress) {
+      onProgress(i + 1, tasks.length);
+    }
+  }
+}

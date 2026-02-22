@@ -3,9 +3,9 @@ export interface SortableTask {
   dependencies: number[];
 }
 
-export interface TieredTask extends SortableTask {
+export type TieredTask<T extends SortableTask = SortableTask> = T & {
   tier: number;
-}
+};
 
 export function topoSort(tasks: SortableTask[]): SortableTask[] {
   const taskMap = new Map<number, SortableTask>();
@@ -52,8 +52,8 @@ export function topoSort(tasks: SortableTask[]): SortableTask[] {
   return result;
 }
 
-export function topoSortWithTiers(tasks: SortableTask[]): TieredTask[] {
-  const taskMap = new Map<number, SortableTask>();
+export function topoSortWithTiers<T extends SortableTask>(tasks: T[]): TieredTask<T>[] {
+  const taskMap = new Map<number, T>();
   for (const task of tasks) {
     taskMap.set(task.id, task);
   }
@@ -61,7 +61,7 @@ export function topoSortWithTiers(tasks: SortableTask[]): TieredTask[] {
   const visiting = new Set<number>();
   const visited = new Set<number>();
   const tierMap = new Map<number, number>();
-  const result: TieredTask[] = [];
+  const result: TieredTask<T>[] = [];
 
   function visit(id: number): number {
     if (visiting.has(id)) {
@@ -95,7 +95,7 @@ export function topoSortWithTiers(tasks: SortableTask[]): TieredTask[] {
     visiting.delete(id);
     visited.add(id);
     tierMap.set(id, tier);
-    result.push({ ...task, tier });
+    result.push({ ...task, tier } as TieredTask<T>);
 
     return tier;
   }
@@ -105,4 +105,12 @@ export function topoSortWithTiers(tasks: SortableTask[]): TieredTask[] {
   }
 
   return result;
+}
+
+export function topoSortDeterministic<T extends SortableTask>(tasks: T[]): TieredTask<T>[] {
+  const tiered = topoSortWithTiers(tasks);
+  return tiered.sort((a, b) => {
+    if (a.tier !== b.tier) return a.tier - b.tier;
+    return a.id - b.id;
+  });
 }
