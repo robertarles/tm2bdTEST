@@ -19,12 +19,14 @@ export const TaskMasterPrioritySchema = z.enum(["high", "medium", "low"]);
 // ---------------------------------------------------------------------------
 
 export const TaskMasterSubtaskSchema = z.object({
-  id: z.number(),
+  id: z.coerce.number(),
   title: z.string(),
   description: z.string(),
   status: TaskMasterStatusSchema,
-  dependencies: z.array(z.number()).optional(),
+  dependencies: z.array(z.coerce.number()).optional(),
   details: z.string().optional(),
+  testStrategy: z.string().optional(),
+  parentId: z.unknown().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -32,24 +34,31 @@ export const TaskMasterSubtaskSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const TaskMasterTaskSchema = z.object({
-  id: z.number(),
+  id: z.coerce.number(),
   title: z.string(),
   description: z.string(),
   status: TaskMasterStatusSchema,
   priority: TaskMasterPrioritySchema,
-  dependencies: z.array(z.number()),
-  complexity: z.number().min(1).max(10).optional(),
+  dependencies: z.array(z.coerce.number()),
+  complexity: z.coerce.number().min(1).max(10).optional(),
   subtasks: z.array(TaskMasterSubtaskSchema).optional(),
   details: z.string().optional(),
   testStrategy: z.string().optional(),
+  recommendedSubtasks: z.number().optional(),
+  expansionPrompt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
 // ---------------------------------------------------------------------------
 // Project (top-level wrapper)
 // ---------------------------------------------------------------------------
 
-export const TaskMasterProjectSchema = z.object({
+const TaskMasterInnerSchema = z.object({
   tasks: z.array(TaskMasterTaskSchema),
+});
+
+export const TaskMasterProjectSchema = z.object({
+  master: TaskMasterInnerSchema,
 });
 
 // ---------------------------------------------------------------------------
@@ -58,7 +67,7 @@ export const TaskMasterProjectSchema = z.object({
 
 export type TaskMasterSubtask = z.infer<typeof TaskMasterSubtaskSchema>;
 export type TaskMasterTask = z.infer<typeof TaskMasterTaskSchema>;
-export type TaskMasterProject = z.infer<typeof TaskMasterProjectSchema>;
+export type TaskMasterProject = z.infer<typeof TaskMasterInnerSchema>;
 
 // ---------------------------------------------------------------------------
 // parseTasksJson  -  read, parse, and validate a tasks.json file
@@ -109,7 +118,8 @@ export async function parseTasksJson(
     );
   }
 
-  return result.data;
+  // Unwrap the master wrapper so callers get { tasks: [...] }
+  return result.data.master;
 }
 
 // ---------------------------------------------------------------------------

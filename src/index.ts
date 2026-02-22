@@ -21,7 +21,7 @@ program
 program
   .command('sync')
   .description('Synchronize tasks from task-master-ai to Beads')
-  .option('-t, --tasks <path>', 'Path to tasks.json file', '.tasks/tasks.json')
+  .option('-t, --tasks <path>', 'Path to tasks.json file', '.taskmaster/tasks/tasks.json')
   .option('-p, --project <path>', 'Path to Beads project directory', '.')
   .option('-d, --dry-run', 'Preview changes without executing', false)
   .option('-f, --force', 'Force sync even if mapping file exists', false)
