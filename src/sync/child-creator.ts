@@ -1,6 +1,7 @@
 export interface ChildSubtask {
   description: string;
   details?: string;
+  testStrategy?: string;
 }
 
 export interface ChildCli {
@@ -31,6 +32,16 @@ export function formatChildDescription(subtask: ChildSubtask): string {
     parts.push("");
     parts.push("## Implementation Details");
     parts.push(subtask.details);
+  }
+
+  if (
+    subtask.testStrategy !== null &&
+    subtask.testStrategy !== undefined &&
+    subtask.testStrategy.trim().length > 0
+  ) {
+    parts.push("");
+    parts.push("## Test Strategy");
+    parts.push(subtask.testStrategy);
   }
 
   return parts.join("\n");
